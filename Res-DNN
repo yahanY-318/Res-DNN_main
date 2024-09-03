@@ -1,0 +1,218 @@
+import os
+import time
+import timeit
+
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
+# from sklearn.datasets import load_boston
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from torchsummary import summary
+from torchviz import make_dot
+from torch.utils.data import TensorDataset, DataLoader
+from tqdm import tqdm
+class Net3(nn.Module):
+    def __init__(self):
+        super(Net3, self).__init__()
+        self.fc1 = nn.Linear(6, 128)
+        self.bn1=nn.BatchNorm1d(128)
+        self.fc11 = nn.ReLU(inplace=True)
+        self.fca1 = nn.Linear(128, 256)
+        self.bn2 = nn.BatchNorm1d(256)
+        self.fcb1 = nn.ReLU(inplace=True)
+        self.fcc1 = nn.Linear(256, 512)
+        self.bn3 = nn.BatchNorm1d(512)
+        self.fcd1 = nn.ReLU(inplace=True)
+        self.fce1 = nn.Linear(512, 1024)
+        self.bn4 = nn.BatchNorm1d(1024)
+        self.fcf1 = nn.ReLU(inplace=True)
+
+        self.fc2 = nn.Linear(1024,2048)
+        self.bn5 = nn.BatchNorm1d(2048)
+        self.fc4 = nn.Linear(6, 2048)
+        # self.fc5 = nn.ReLU()
+        self.fc22 = nn.ReLU(inplace=True)
+        self.fc3 = nn.Linear(2048, 1)
+
+    def forward(self, x):
+        residual = x.clone()
+        logits = self.fc1(x)
+        logits=self.bn1(logits)
+        logits = self.fc11(logits)
+        logits = self.fca1(logits)
+        logits = self.bn1(logits)
+        logits = self.fcb1(logits)
+        logits = self.fcc1(logits)
+        logits = self.bn1(logits)
+        logits = self.fcd1(logits)
+        logits = self.fce1(logits)
+        logits = self.bn1(logits)
+        logits = self.fcf1(logits)
+        logits = self.fc2(logits)
+        residual = self.fc4(residual)
+        # residual = self.fc5(residual)
+        logits += residual
+        logits = self.bn1(logits)
+        logits = self.fc22(logits)
+        logits = self.fc3(logits)
+        return logits
+if __name__ == '__main__':
+        target_extension = '.bmp'  # 目标扩展名
+        xx=np.zeros((256 * 256*ybs, 6))
+        x=np.zeros((256 * 256, 6))
+        yy=np.zeros((256 * 256*ybs))
+  
+        for i,filename in enumerate(os.listdir(folder_path)):
+            file_path = os.path.join(folder_path, filename)
+            if os.path.isfile(file_path) and file_path.lower().endswith(target_extension):
+                yy[(i)*65536:(i+1)*65536] = np.array(cv2.imread(file_path, -1)).flatten().T
+        XX=torch.from_numpy(xx).float()
+        # XX = torch.Tensor(X).float()
+        yy=torch.from_numpy(yy).float().view(-1, 1)
+        X_train = torch.from_numpy(X_train).float()
+        X_test = torch.from_numpy(X_test).float()
+        y_train = torch.from_numpy(y_train).float().view(-1, 1)
+        train_dataset = TensorDataset(X_train, y_train)
+        test_dataset = TensorDataset(X_test, y_test)
+        torch.save(train_dataset, 'train_dataset.pth')
+        torch.save(train_dataset, 'test_dataset.pth')
+        torch.save(X_test, 'X_test.pth')
+        torch.save(XX, 'XX.pth')
+        torch.save(yy, 'yy.pth')
+    else:
+        train_dataset = torch.load('train_dataset.pth')
+        test_dataset = torch.load('test_dataset.pth')
+        X_test=torch.load('X_test.pth')
+        XX=torch.load('XX.pth')
+
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print("using {} device.".format(device))
+    net = Net2dres2().to(device)    
+    
+    # net = Net1().to(device)Net2dres3
+    # load_path = './dnnsave/dnnhglz2plgpustcd0812DNN_385.pth'
+    # state_dict = torch.load(load_path)
+    # net.load_state_dict(state_dict)
+
+    # print(summary(net,
+    criterion = nn.MSELoss(reduction='mean')
+    # optimizer = optim.SGD(net.parameters(), lr=0.01) # 定义优化器
+    # criterion = nn.CrossEntropyLoss()
+    # optimizer = optim.Adam(net.parameters(), lr=0.001)
+    optimizer = optim.Adam(net.parameters(), lr=0.0001)
+    epochs=1000
+    minloss=500
+    tcjsq=0
+    lossxl=[]
+    fitxl=[]
+    telossxl=[]
+    tefitxl=[]
+    stime = timeit.default_timer()
+    for epoch in range(epochs):
+        # stime=time.time()
+        net.train()
+        running_loss = 0.0
+        terunning_loss = 0.0
+        progress_bar = tqdm(enumerate(train_loader), total=len(train_loader))
+        for batch_idx, (inputs, labels) in progress_bar:
+        # for data in train_loader:
+        #     inputs, labels = data
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+            optimizer.zero_grad()
+            outputs = net(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            # running_loss += loss.item()
+            running_loss += loss.cpu().detach().numpy()
+        fit = 1 - loss.item() / torch.var(labels)
+        avgloss=running_loss / len(train_loader)
+        lossxl.append(avgloss)
+        fitxl.append(fit.cpu().numpy())
+        print('Epoch [{}/{}], Loss: {:.4f},Reg: {:.4f}'.format(epoch+1, epochs, avgloss,fit))
+        net.eval()
+        running_loss = 0.0
+        progress_bartest = tqdm(enumerate(test_loader), total=len(test_loader))
+        with torch.no_grad():
+            for batch_idx, (inputs, labels) in progress_bartest:
+                # for data in train_loader:
+                #     inputs, labels = data
+                inputs = inputs.to(device)
+                labels = labels.to(device)
+                optimizer.zero_grad()
+                outputs = net(inputs)
+                loss = criterion(outputs, labels)
+                # running_loss += loss.item()
+                running_loss += loss.cpu().detach().numpy()
+        tefit = 1 - loss.item() / torch.var(labels)
+        testavgloss = running_loss / len(test_loader)
+        telossxl.append(testavgloss)
+        tefitxl.append(tefit.cpu().numpy())
+        print('Test MSE: {:.4f},Reg: {:.5f}'.format(testavgloss, tefit))
+        if xz==0 and tefit > best_fit:
+            # if tefit >best_fit or loss < 1e-6:
+            best_fit = tefit
+            # timepul = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            save_path = './dnnsave/Net2dres2/{}1201_{}.pth'.format('resDNN', epoch + 1)
+            torch.save(net.state_dict(), save_path)
+            save_path1 = './dnnsave/Net2dres2/{}1201_{}.pb'.format('resDNN', epoch + 1)
+            torch.save(net, save_path1)
+            print('Finished Training')
+            # break
+        if xz==1 and testavgloss < minloss:
+            tcjsq=0
+            # if tefit >best_fit or loss < 1e-6:
+            minloss = testavgloss
+            # timepul = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            save_path = './dnnsave/Net2dres2/{}_pl{}1201_{}.pth'.format('resDNNloss',batch_size, epoch + 1)
+            torch.save(net.state_dict(), save_path)
+            save_path1 = './dnnsave/Net2dres2/{}_pl{}1201_{}.pb'.format('resDNNloss',batch_size, epoch + 1)
+            torch.save(net, save_path1)
+            print('save Training')
+        elif xz==1 and testavgloss >= minloss:
+            tcjsq=tcjsq+1
+            if tcjsq==6:
+                tcjsq=0
+                print('Finished Training')
+                break
+
+    etime = timeit.default_timer()
+    cost_time=(etime-stime)
+    print("======================================")
+    print("all epoch={},GPU all cost time:{:.2f}s".format(epoch+1, cost_time))
+    bclj='./dnnsave/Net2dres2/'
+    huat(epoch+1, np.array(lossxl),bclj,'loss')
+    huat(epoch+1, np.array(fitxl),bclj, 'fit')
+    huat(epoch+1, np.array(telossxl), bclj,'teloss')
+    huat(epoch+1, np.array(tefitxl),bclj, 'tefit')
+    net.eval()
+    with torch.no_grad():
+        y_pred = net(X_test.to(device))
+        mse = criterion(y_pred, y_test.to(device))
+        fit = 1 - mse.item() / torch.var(y_test.to(device))
+        print('Test MSE: {:.4f},Reg: {:.5f}'.format(mse.item(),fit))
+
+    stime =timeit.default_timer()
+    net.eval()
+    with torch.no_grad():
+        c_pred = net(XX[0:65536,0:6].to(device))
+        etime =timeit.default_timer()
+        cost_time = (etime - stime)
+        mse = criterion(c_pred, yy[0:65536].to(device))
+        fit = 1 - mse.item() / torch.var(yy.to(device))
+        print("======================================")
+        print('All MSE: {:.4f},Reg: {:.5f}'.format(mse.item(),fit))
+        print("GPU single cost time:{:.2f}s".format(cost_time))
+    # imgrh=c_pred.reshape(256*12,256*12).cpu().clone()
+    imgrh = c_pred.reshape(256, 256).cpu().clone().numpy()
+    imgrh = np.clip(imgrh, 0, 255).astype(np.uint8)
+    plt.figure()
+    plt.imshow(imgrh)
+    plt.gray()
+    plt.title('sednn')
+    plt.show()
