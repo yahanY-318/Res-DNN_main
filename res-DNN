@@ -1,0 +1,60 @@
+class Net2dres2(nn.Module):
+    def __init__(self,in0,in1,in2,num0，num1):
+        super(Net2dres2, self).__init__()
+        self.in0=in0
+        self.in1=in1
+        self.in2=in2
+        self.num0=num0
+        self.num1=num1
+        self.fc1 = nn.Linear(in0, in1)
+        self.bn1 = nn.BatchNorm1d(num_features=num0)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(in1, in2)
+        self.bn2 = nn.BatchNorm1d(num0)
+
+        self.fc3 = nn.Linear(in1, in2)
+        self.bn3 = nn.BatchNorm1d(num1)
+        # self.fcd1 = nn.ReLU(inplace=True)
+        self.fc4 = nn.Linear(in2, in1)
+        self.bn4 = nn.BatchNorm1d(num1)
+
+        self.fc5 = nn.Linear(in1, in2)
+        self.bn5 = nn.BatchNorm1d(num1)
+        self.fc6 = nn.Linear(in1, in0)
+        self.bn6 = nn.BatchNorm1d(num2)
+        self.fc2res = nn.Linear(in2, in1)
+        self.fc6res = nn.Linear(in1, in2)
+        self.fc7 = nn.Linear(in2, in0)
+
+        self.fc8 = nn.Linear(12, 1)
+    def forward(self, x):
+        residual0 = x.clone()
+        logits = self.fc1(x)
+        logits2res = logits.clone()
+        # logits = self.bn1(logits)
+        logits = self.relu(logits)
+        logits = self.fc2(logits)
+        # logits = self.bn2(logits)
+        logits = self.relu(logits)
+        logits = self.fc3(logits)
+        # logits = self.bn3(logits)
+        logits = self.relu(logits)
+        logits = self.fc4(logits)
+        logits2 = self.fc2res(logits2res)
+        logits += logits2
+        # logits = self.bn4(logits)
+        logits = self.relu(logits)
+        logits = self.fc5(logits)
+        # logits = self.bn5(logits)
+
+        residual = self.fc6res(residual0)
+        # residual = self.fc5(residual)
+        logits += residual
+        # logits = self.bn5(logits)
+        logits = self.relu(logits)
+        logits = self.fc7(logits)
+        # logits += residual
+        logits = torch.cat((logits, residual0), dim=1)
+        logits = self.relu(logits)
+        logits = self.fc8(logits)
+        return logits
